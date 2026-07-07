@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIXEL TRADING FLOOR</title>
+<style>
+@font-face {
+  font-family: 'NeoDGM';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/NeoDunggeunmo.woff') format('woff');
+  font-display: swap;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #e9e5db;   /* 밝은 오피스 톤 */
+  font-family: 'NeoDGM', 'Courier New', monospace;
+  color: #e8e2d0;
+  image-rendering: pixelated;
+  overflow-x: hidden;
+}
+canvas { image-rendering: pixelated; }
+
+/* ---------- 상단 바 ---------- */
+#topbar {
+  display: flex; align-items: center; gap: 12px;
+  background: #17171c; border-bottom: 3px solid #2a2a33;
+  padding: 8px 14px; flex-wrap: wrap;
+}
+#topbar h1 { font-size: 15px; color: #ffd24a; letter-spacing: 1px; }
+#topbar h1 span { color: #6de08c; }
+#searchWrap { position: relative; }
+#tickerInput {
+  background: #000; border: 2px solid #ffd24a; color: #fff;
+  font-family: inherit; font-size: 13px; padding: 5px 8px; width: 230px;
+}
+#searchDrop {
+  position: absolute; top: 100%; left: 0; width: 300px; max-height: 260px;
+  overflow-y: auto; background: #17171c; border: 2px solid #ffd24a;
+  display: none; z-index: 200;
+}
+#searchDrop .opt {
+  padding: 6px 8px; font-size: 12px; cursor: pointer;
+  display: flex; gap: 8px; align-items: baseline;
+}
+#searchDrop .opt:hover, #searchDrop .opt.sel { background: #33301c; }
+#searchDrop .opt b { color: #fff; }
+#searchDrop .opt .sym { color: #ffd24a; margin-left: auto; }
+#searchDrop .opt .mk { font-size: 10px; color: #888; }
+#dateInput {
+  background: #000; border: 2px solid #555; color: #aaa;
+  font-family: inherit; font-size: 12px; padding: 5px 6px;
+}
+#analyzeBtn {
+  background: #ffd24a; border: none; color: #211a00;
+  font-family: inherit; font-size: 13px; font-weight: bold;
+  padding: 7px 14px; cursor: pointer; box-shadow: 3px 3px 0 #7a6420;
+}
+#analyzeBtn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 #7a6420; }
+#analyzeBtn:disabled { background: #666; color: #333; cursor: wait; }
+#clocks { margin-left: auto; display: flex; gap: 14px; font-size: 11px; color: #9adfae; }
+#clocks b { color: #666; margin-right: 4px; }
+#marketDot { color: #6de08c; font-size: 11px; }
+#marketDot::before { content: "● "; animation: blink 1.6s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+#wsState { font-size: 10px; color: #777; }
+
+/* ---------- 차트 ---------- */
+#chartWrap {
+  background: #060a06; border-bottom: 3px solid #2a2a33;
+  padding: 4px 10px 0; position: relative;
+}
+#chartInfo { position: absolute; top: 8px; left: 16px; font-size: 13px; z-index: 2; }
+#chartInfo .px { color: #fff; font-size: 18px; }
+#chartInfo .chg-up { color: #ff6a6a; }
+#chartInfo .chg-dn { color: #6aa8ff; }
+#chartLegend { position: absolute; top: 8px; right: 16px; font-size: 10px; z-index: 2; }
+#chartLegend .ma20 { color: #ffd24a; } #chartLegend .ma60 { color: #c77dff; }
+#chart { width: 100%; height: 120px; display: block; }
+
+/* ---------- 메인 플로어 ---------- */
+#floor {
+  display: grid; gap: 8px; padding: 8px;
+  grid-template-columns: 1.15fr .95fr .9fr;
+  grid-template-areas: "analyst research log" "analyst trading log";
+}
+@media (max-width: 1050px) {
+  #floor { grid-template-columns: 1fr 1fr; grid-template-areas: "analyst research" "analyst trading" "log log"; }
+}
+/* 사무실 방: 벽(상단 띠) + 바닥 + 부서 명패 */
+.room {
+  border: 4px solid #8f887a; outline: 2px solid #6e675a; position: relative;
+  padding: 44px 12px 14px; overflow: hidden;
+}
+.room::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 32px;
+  background: #f2eee4; border-bottom: 4px solid #b9b2a2;
+}
+.rheader { color: #2b2b30 !important; }
+.rheader em { color: #8a8478 !important; }
+.rheader {
+  position: absolute; top: 6px; left: 10px; right: 10px; z-index: 6;
+  display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: #fff;
+}
+.rheader .rnum {
+  background: var(--dept, #ffd24a); color: #17171c; padding: 1px 6px;
+  font-size: 11px; border: 2px solid #000;
+}
+.rheader em { font-style: normal; font-size: 10px; color: #9a9aa8; margin-left: auto; }
+#roomAnalyst { --dept: #4a9edb; grid-area: analyst; background: #cfa878;
+  background-image: linear-gradient(rgba(0,0,0,.05) 2px, transparent 2px),
+                    linear-gradient(90deg, rgba(255,255,255,.07) 2px, transparent 2px);
+  background-size: 32px 32px; }
+#roomResearch { --dept: #e8965a; grid-area: research; background: #7d89ad;
+  background-image: radial-gradient(rgba(255,255,255,.1) 1px, transparent 1px);
+  background-size: 14px 14px; }
+#roomTrading { --dept: #b07ad0; grid-area: trading; background: #8d7ba3;
+  background-image: radial-gradient(rgba(255,255,255,.1) 1px, transparent 1px);
+  background-size: 14px 14px; }
+
+/* 부서 내 구역 라벨 */
+.subdiv {
+  display: flex; align-items: center; gap: 8px; margin: 12px 2px 8px;
+  font-size: 10px; color: rgba(255,255,255,.8); letter-spacing: 1px;
+}
+.subdiv::before, .subdiv::after { content: ""; flex: 1; height: 2px; background: rgba(255,255,255,.18); }
+
+/* 리서치실 회의 테이블 */
+#researchGrid { position: relative; }
+#researchGrid::before {
+  content: ""; position: absolute; left: 50%; top: 60%;
+  width: 100px; height: 56px; transform: translate(-50%, -50%);
+  background: #7a5a38; border: 4px solid #4a3520; border-radius: 50%;
+  box-shadow: inset 0 6px 0 rgba(255,255,255,.12); z-index: 0;
+}
+#researchGrid .unit { z-index: 2; }
+#researchGrid::after { /* 테이블 위 서류 */
+  content: ""; position: absolute; left: 50%; top: 56%;
+  width: 12px; height: 9px; transform: translate(-70%, -50%) rotate(-6deg);
+  background: #fffdf5; border: 1px solid #b9ad92;
+  box-shadow: 14px 3px 0 #fffdf5, 15px 4px 0 #b9ad92; z-index: 1;
+}
+
+/* 트레이딩룸 전광판 */
+.wallboard {
+  height: 24px; margin: 0 4px 10px; border: 3px solid #000; background: #060a06;
+  background-image: repeating-linear-gradient(90deg,
+    #1f8a3d 0 4px, transparent 4px 8px, #c0392b 8px 12px, transparent 12px 16px,
+    #35b558 16px 20px, transparent 20px 26px);
+  background-size: 52px 65%; background-repeat: repeat-x; background-position: 0 100%;
+  animation: board 1.2s steps(6) infinite;
+}
+@keyframes board { to { background-position: -52px 100%; } }
+
+/* 화분 소품 */
+.plant { position: absolute; bottom: 10px; right: 10px; width: 20px; height: 26px; z-index: 1; }
+.plant::before {
+  content: ""; position: absolute; left: 4px; top: 0; width: 4px; height: 4px;
+  background: #3e9e52;
+  box-shadow: 4px 0 0 #57c46b, 8px 2px 0 #3e9e52, 0 4px 0 #57c46b,
+              4px 4px 0 #2f7c40, 8px 6px 0 #57c46b, 4px 8px 0 #3e9e52;
+}
+.plant::after {
+  content: ""; position: absolute; left: 2px; bottom: 0; width: 12px; height: 8px;
+  background: #a9603a; border: 2px solid #5e3018;
+}
+#logPanel { grid-area: log; background: #101014; border: 3px solid #000;
+  box-shadow: 0 0 0 2px #2a2a33; display: flex; flex-direction: column; min-height: 300px; }
+
+.deskgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 8px; }
+.deskgrid.solo { grid-template-columns: 1fr; }
+.trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
+
+/* ---------- 캐릭터 유닛 (큐비클/워크스테이션) ---------- */
+.unit {
+  display: flex; flex-direction: column; align-items: center; position: relative;
+  padding: 8px 4px 6px;
+  background: rgba(255,255,255,.07); border: 2px solid rgba(0,0,0,.28);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.08);
+}
+.unit .desk {
+  width: 116px; height: 16px; background: #8a6238; border: 2px solid #3a2413;
+  margin-top: -6px; z-index: 1; position: relative;
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.18);
+}
+.unit .desk::before { /* 키보드 */
+  content: ""; position: absolute; left: 10px; top: 4px; width: 22px; height: 7px;
+  background: #2e2e38; box-shadow: inset 2px 2px 0 #4a4a58;
+}
+.unit .desk .mug { /* 커피잔 */
+  position: absolute; left: 40px; top: -9px; width: 9px; height: 9px;
+  background: #e8eef5; border: 2px solid #333;
+}
+.unit .desk .mug::before { /* 손잡이 */
+  content: ""; position: absolute; right: -5px; top: 2px; width: 3px; height: 4px;
+  border: 2px solid #333; border-left: none;
+}
+.unit .desk .mug::after { /* 김 */
+  content: ""; position: absolute; left: 2px; top: -5px; width: 3px; height: 3px;
+  background: rgba(255,255,255,.85);
+  animation: steam 1.8s steps(4) infinite;
+}
+@keyframes steam { 0% { transform: translateY(0); opacity: .9; } 100% { transform: translateY(-9px); opacity: 0; } }
+.unit .desk .monitor {
+  position: absolute; right: 4px; top: -20px; width: 26px; height: 18px;
+  background: #0a120a; border: 2px solid #24242c;
+  background-image: linear-gradient(#1f8a3d 0 0), linear-gradient(#35b558 0 0), linear-gradient(#c0392b 0 0);
+  background-size: 3px 6px, 3px 10px, 3px 8px;
+  background-position: 3px 100%, 8px 100%, 13px 100%;
+  background-repeat: no-repeat;
+  animation: monbars 1.4s steps(2) infinite;
+}
+@keyframes monbars {
+  0%   { background-size: 3px 6px, 3px 10px, 3px 8px; }
+  50%  { background-size: 3px 11px, 3px 5px, 3px 12px; }
+  100% { background-size: 3px 8px, 3px 9px, 3px 6px; }
+}
+.unit .desk .monitor::after { /* 받침대 */
+  content: ""; position: absolute; left: 50%; top: 100%; width: 6px; height: 3px;
+  transform: translateX(-50%); background: #24242c;
+}
+.room#roomResearch .desk, .room#roomTrading .desk { background: #4c5a80; border-color: #222b42; }
+.unit .sprite { z-index: 2; animation: idle 2.6s steps(2) infinite; }
+@keyframes idle { 50% { transform: translateY(-2px); } }
+.unit .sprite canvas, .unit .sprite img { display: block; }
+.unit.active .sprite { animation: hop .45s steps(2) infinite; }
+@keyframes hop { 50% { transform: translateY(-4px); } }
+.unit .nm { font-size: 12px; color: #fff; text-shadow: 2px 2px 0 #000; margin-top: 2px; letter-spacing: 1px; }
+.unit .role {
+  font-size: 10px; padding: 2px 6px; margin-top: 3px;
+  background: #000; border: 2px solid var(--rc, #6de08c); color: var(--rc, #6de08c);
+}
+.unit .status {
+  font-size: 10px; color: #ddd; background: rgba(0,0,0,.72);
+  border: 2px solid #000; padding: 2px 6px; margin-top: 4px;
+  min-height: 18px; max-width: 150px; text-align: center;
+}
+.unit .status:empty { visibility: hidden; }
+
+/* 말풍선 */
+.bubble {
+  position: absolute; bottom: calc(100% - 2px); left: 50%; transform: translateX(-50%);
+  width: 210px; max-height: 120px; overflow: hidden;
+  background: #fffbe8; color: #222; border: 3px solid #000;
+  font-size: 11px; line-height: 1.45; padding: 6px 8px; z-index: 20;
+  display: none; word-break: break-all;
+}
+.bubble::after {
+  content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px;
+  border: 6px solid transparent; border-top-color: #000;
+}
+.unit.talking .bubble { display: block; }
+.bubble .cur { display: inline-block; width: 8px; background: #222; animation: blink .8s steps(2) infinite; }
+
+/* ---------- 로그 패널 (밝은 리포트 디자인) ---------- */
+#logPanel { background: #efe9da; }
+#logPanel h2 {
+  font-size: 12px; background: #1c1c24; color: #ffd24a;
+  padding: 6px 10px; border-bottom: 3px solid #000;
+  display: flex; align-items: center;
+}
+#healthBtn {
+  margin-left: auto; background: #6de08c; border: 2px solid #000; color: #08300f;
+  font-family: inherit; font-size: 10px; padding: 2px 8px; cursor: pointer;
+}
+#log { flex: 1; overflow-y: auto; padding: 8px; font-size: 12px; }
+.logitem { margin-bottom: 8px; border: 2px solid #b9ad92; background: #fffdf5; }
+.logitem .lh {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  cursor: pointer; background: #f3ecd9; border-bottom: 1px solid #d8ceb4;
+}
+.logitem .lh canvas { width: 22px; height: 22px; }
+.logitem .lh b { color: #7a5a00; font-size: 12px; }
+.logitem .lh .lt { color: #333; }
+.logitem .lh span.tm { color: #999; font-size: 10px; margin-left: auto; }
+.logitem .lh .arrow { color: #999; font-size: 10px; }
+.logitem .body {
+  display: none; padding: 10px 12px;
+  color: #2b2b2b; max-height: 320px; overflow-y: auto; line-height: 1.75;
+  font-size: 12.5px; background: #fffdf5;
+}
+.logitem.open .body { display: block; }
+.body h3, .body h4 { color: #7a5a00; margin: 10px 0 4px; font-size: 13px; }
+.body strong { color: #a33; }
+.body ul { margin: 4px 0 8px 18px; }
+.body li { margin-bottom: 3px; }
+.body p { margin-bottom: 8px; }
+.body hr { border: none; border-top: 1px dashed #cbbf9f; margin: 8px 0; }
+.body table { border-collapse: collapse; margin: 6px 0; }
+.body td, .body th { border: 1px solid #cbbf9f; padding: 3px 6px; font-size: 11px; }
+
+/* ---------- 하단 티커 ---------- */
+#tape {
+  background: #17171c; border-top: 3px solid #8f887a; overflow: hidden;
+  white-space: nowrap; font-size: 12px; padding: 5px 0;
+}
+#tapeInner { display: inline-block; padding-left: 100%; animation: scroll 30s linear infinite; }
+@keyframes scroll { to { transform: translateX(-100%); } }
+.up { color: #ff6a6a; } .dn { color: #6aa8ff; } .fl { color: #999; }
+
+/* ---------- BOSS 상담실 ---------- */
+#chatDock {
+  position: fixed; right: 12px; bottom: 40px; width: 360px; max-height: 70vh;
+  background: #fffdf5; border: 4px solid #23232c; outline: 2px solid #000;
+  display: none; flex-direction: column; z-index: 90;
+  box-shadow: 6px 6px 0 rgba(0,0,0,.35);
+}
+#chatDock.open { display: flex; }
+#chatHead {
+  background: #1c1c24; color: #ffd24a; font-size: 12px; padding: 7px 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+#chatHead canvas { width: 22px; height: 22px; }
+#chatHead button {
+  margin-left: auto; background: none; border: none; color: #888;
+  font-family: inherit; font-size: 13px; cursor: pointer;
+}
+#portfolioBar {
+  background: #f3ecd9; border-bottom: 2px solid #d8ceb4; padding: 6px 8px;
+  font-size: 11px; color: #333; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+}
+#portfolioBar input {
+  width: 74px; background: #fff; border: 2px solid #b9ad92; color: #222;
+  font-family: inherit; font-size: 11px; padding: 3px 5px;
+}
+#portfolioBar button {
+  background: #ffd24a; border: 2px solid #000; font-family: inherit;
+  font-size: 10px; padding: 2px 8px; cursor: pointer;
+}
+#pfInfo { color: #1f8a3d; font-size: 10px; width: 100%; }
+#chatLog { flex: 1; overflow-y: auto; padding: 10px; min-height: 180px; }
+.cmsg { margin-bottom: 10px; display: flex; gap: 6px; }
+.cmsg .cbody {
+  max-width: 84%; padding: 7px 10px; font-size: 12px; line-height: 1.65;
+  border: 2px solid #b9ad92; background: #fff; color: #2b2b2b;
+}
+.cmsg.user { justify-content: flex-end; }
+.cmsg.user .cbody { background: #dcedc8; border-color: #9cba7f; }
+.cmsg.boss .cbody h4 { color: #7a5a00; margin: 6px 0 3px; }
+.cmsg.boss .cbody ul { margin: 3px 0 6px 16px; }
+.cmsg canvas { width: 26px; height: 26px; flex-shrink: 0; }
+#chatInputRow { display: flex; border-top: 2px solid #d8ceb4; }
+#chatInput {
+  flex: 1; border: none; background: #fffdf5; color: #222;
+  font-family: inherit; font-size: 12px; padding: 9px 10px; outline: none;
+}
+#chatSend {
+  background: #6de08c; border: none; border-left: 2px solid #d8ceb4;
+  font-family: inherit; font-size: 12px; padding: 0 16px; cursor: pointer;
+}
+#chatSend:disabled { background: #ccc; }
+#chatOpenBtn {
+  position: fixed; right: 12px; bottom: 40px; z-index: 89;
+  background: #ffd24a; border: 3px solid #000; font-family: inherit;
+  font-size: 12px; padding: 8px 12px; cursor: pointer;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.35);
+}
+
+/* ---------- 최종 판단 모달 ---------- */
+#decisionModal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.75);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+#decisionModal .box {
+  background: #fffdf5; border: 4px solid #ffd24a; max-width: 680px; width: 92%;
+  max-height: 80vh; display: flex; flex-direction: column;
+}
+#decisionModal h3 {
+  background: #ffd24a; color: #211a00; font-size: 14px; padding: 8px 12px;
+}
+#decisionText { padding: 16px; font-size: 13px; line-height: 1.8; overflow-y: auto; color: #2b2b2b; }
+#decisionText h3, #decisionText h4 { color: #7a5a00; margin: 10px 0 4px; }
+#decisionText strong { color: #a33; }
+#decisionText ul { margin: 4px 0 8px 18px; }
+#decisionModal button {
+  margin: 10px; align-self: flex-end; background: #ffd24a; border: none;
+  font-family: inherit; font-size: 12px; padding: 6px 14px; cursor: pointer;
+}
+#disclaim { font-size: 10px; color: #777; padding: 0 14px 10px; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>PIXEL TRADING FLOOR <span>◆</span></h1>
+  <div id="searchWrap">
+    <input id="tickerInput" placeholder="종목명 또는 티커 (삼성전자, AAPL...)" autocomplete="off">
+    <div id="searchDrop"></div>
+  </div>
+  <input id="dateInput" type="date">
+  <button id="analyzeBtn">▶ ANALYZE</button>
+  <span id="wsState">connecting...</span>
+  <div id="clocks">
+    <span><b>NYC</b><span id="clkNYC"></span></span>
+    <span><b>LDN</b><span id="clkLDN"></span></span>
+    <span><b>SEL</b><span id="clkSEL"></span></span>
+    <span id="marketDot">MARKET</span>
+  </div>
+</div>
+
+<div id="chartWrap">
+  <div id="chartInfo"><span class="px">-</span> <span class="chg fl">-</span></div>
+  <div id="chartLegend">— 종가 <span class="ma20">— MA20</span> <span class="ma60">— MA60</span></div>
+  <canvas id="chart"></canvas>
+</div>
+
+<div id="floor">
+  <div class="room" id="roomAnalyst">
+    <div class="rheader"><span class="rnum">01</span> 애널리스트실 <em>시장 데이터 수집 · 4개 분야 분석</em></div>
+    <div class="deskgrid" id="analystGrid"></div>
+    <div class="plant"></div>
+  </div>
+  <div class="room" id="roomResearch">
+    <div class="rheader"><span class="rnum">02</span> 리서치실 <em>매수 vs 매도 토론</em></div>
+    <div class="deskgrid" id="researchGrid"></div>
+    <div class="subdiv">토론 결론</div>
+    <div class="deskgrid solo" id="managerGrid"></div>
+    <div class="plant"></div>
+  </div>
+  <div class="room" id="roomTrading">
+    <div class="rheader"><span class="rnum">03</span> 트레이딩룸 <em>매매 결정 · 리스크 관리</em></div>
+    <div class="wallboard"></div>
+    <div class="deskgrid solo" id="traderGrid"></div>
+    <div class="subdiv">리스크 관리팀</div>
+    <div class="trio" id="riskGrid"></div>
+    <div class="subdiv">최종 승인</div>
+    <div class="deskgrid solo" id="bossGrid"></div>
+  </div>
+  <div id="logPanel">
+    <h2>■ 분석 리포트 로그 <button id="healthBtn">⚙ 시스템 점검</button></h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<div id="tape"><div id="tapeInner">PIXEL TRADING FLOOR ◆ 티커를 입력하고 ANALYZE를 눌러주세요 ◆ 본 화면은 연구용이며 투자 자문이 아닙니다 ◆</div></div>
+
+<button id="chatOpenBtn">💼 BOSS 상담실</button>
+<div id="chatDock">
+  <div id="chatHead"><span id="chatBossIcon"></span> BOSS 상담실 — 펀드매니저와 대화
+    <button id="chatClose">✕</button></div>
+  <div id="portfolioBar">
+    <b id="pfTicker">-</b>
+    <input id="pfShares" type="number" min="0" placeholder="보유 수량">주
+    <input id="pfPrice" type="number" min="0" placeholder="평단가">원/$
+    <button id="pfSave">저장</button>
+    <span id="pfInfo"></span>
+  </div>
+  <div id="chatLog"></div>
+  <div id="chatInputRow">
+    <input id="chatInput" placeholder="예: 30주 보유 중인데 더 살까요?">
+    <button id="chatSend">전송</button>
+  </div>
+</div>
+
+<div id="decisionModal">
+  <div class="box">
+    <h3>★ 수석 트레이더 &amp; 펀드매니저 최종 판단</h3>
+    <div id="decisionText"></div>
+    <div id="disclaim">※ LLM 에이전트의 연구용 출력입니다. 투자 자문이 아니며, 판단과 책임은 본인에게 있습니다.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin:10px;">
+      <button onclick="document.getElementById('decisionModal').style.display='none';openChat();" style="background:#6de08c;">💼 BOSS와 상담하기</button>
+      <button onclick="document.getElementById('decisionModal').style.display='none'">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==================== 픽셀 캐릭터 생성기 ==================== */
+/* 20x20 그리드에 귀여운 동물 블롭을 그린다. */
+function drawSprite(canvas, opt) {
+  const S = 4, W = 22, H = 24;
+  canvas.width = W * S; canvas.height = H * S;
+  const ctx = canvas.getContext('2d');
+  const px = (x, y, c) => { if (!c || x < 0 || y < 0 || x >= W || y >= H) return; ctx.fillStyle = c; ctx.fillRect(x * S, y * S, S, S); };
+  const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px(x, y, c); };
+
+  const F = opt.body, D = opt.dark, L = opt.light || '#fffdf5';
+  const SH = opt.shirt || '#e8c05a';
+  const I = '#ffb3c1';  // 귀 안쪽 핑크
+
+  /* ---- 귀 (머리 위 y0~5) ---- */
+  const E = opt.earColor || F;
+  switch (opt.ears) {
+    case 'cat':
+      px(5,2,E); rect(4,3,6,5,E); px(16,2,E); rect(15,3,17,5,E);
+      px(5,4,I); px(16,4,I); break;
+    case 'bunny':
+      rect(6,0,7,5,E); rect(14,0,15,5,E);
+      px(7,1,I); px(7,2,I); px(7,3,I); px(14,1,I); px(14,2,I); px(14,3,I); break;
+    case 'chick':
+      px(10,3,E); px(11,2,E); px(12,3,E); break;
+    case 'dog':
+      rect(2,8,4,14,D); rect(17,8,19,14,D);
+      px(3,9,I); px(18,9,I); break;
+    case 'horns':
+      px(2,2,'#efe6d2'); rect(3,3,5,4,'#efe6d2');
+      px(19,2,'#efe6d2'); rect(16,3,18,4,'#efe6d2'); break;
+    case 'bear':
+      rect(4,2,6,4,E); rect(15,2,17,4,E);
+      px(5,3,I); px(16,3,I); break;
+    case 'owl':
+      px(4,2,E); px(5,3,E); px(4,3,E); px(17,2,E); px(16,3,E); px(17,3,E); break;
+    case 'hamster':
+      rect(5,3,6,4,E); rect(15,3,16,4,E); px(5,4,I); px(16,4,I); break;
+    case 'panda':
+      rect(4,2,6,4,'#2b2b2b'); rect(15,2,17,4,'#2b2b2b'); break;
+    case 'none': break;
+  }
+
+  /* ---- 머리 (크고 둥근 동숲 비율) ---- */
+  rect(6,5,15,5,F);
+  rect(4,6,17,7,F);
+  rect(3,8,18,13,F);
+  rect(4,14,17,15,F);
+  rect(6,16,15,16,F);
+
+  /* ---- 무늬 ---- */
+  if (opt.patch === 'panda') { rect(5,9,7,12,'#2b2b2b'); rect(14,9,16,12,'#2b2b2b'); }
+  if (opt.patch === 'penguinface') { rect(6,8,15,15,'#fffdf5'); }
+
+  /* ---- 주둥이/부리 ---- */
+  if (opt.muzzle !== false && opt.patch !== 'penguinface') rect(9,12,12,15,opt.muzzleColor || L);
+
+  /* ---- 눈 (크고 반짝이게) ---- */
+  const eye = (x) => {
+    if (opt.patch === 'panda') { px(x,10,'#fff'); px(x+1,11,'#fff'); return; }
+    rect(x,9,x+1,11,'#2b2320'); px(x,9,'#fff');
+  };
+  if (!opt.glasses) { eye(6); eye(14); }
+  else { /* 선글라스 */
+    rect(4,9,8,11,'#15151a'); rect(13,9,17,11,'#15151a'); rect(9,9,12,9,'#15151a');
+    px(5,9,'#3d3d4d'); px(14,9,'#3d3d4d');
+  }
+
+  /* ---- 코/입 + 블러셔 ---- */
+  if (opt.beak) { rect(10,12,11,13,'#ff9b2d'); px(10,14,D); }
+  else { px(10,12,D); px(11,12,D); px(10,14,D); px(11,14,D); }
+  px(3,12,I); px(4,12,I); px(17,12,I); px(18,12,I);
+
+  /* ---- 몸 (작게) + 옷 ---- */
+  rect(7,17,14,22,SH);
+  px(7,17,L); px(14,17,L);                       // 옷깃
+  rect(5,17,6,20,F); rect(15,16+1,16,20,F);      // 팔
+  rect(8,23,9,23,opt.feet || F); rect(12,23,13,23,opt.feet || F);  // 발
+
+  if (opt.shirtDots) { px(9,19,L); px(12,20,L); px(10,21,L); }
+  if (opt.acc === 'shell') {
+    rect(7,17,14,22,'#3e7c4f');
+    px(9,18,'#57c46b'); px(12,18,'#57c46b'); px(8,20,'#57c46b'); px(11,20,'#57c46b'); px(13,21,'#57c46b');
+  }
+  if (opt.acc === 'scarf') { rect(7,17,14,18,'#e05d5d'); px(13,19,'#e05d5d'); }
+  if (opt.acc === 'tie') { px(10,18,'#c0392b'); px(11,18,'#c0392b'); px(10,19,'#c0392b'); px(11,20,'#c0392b'); }
+  if (opt.acc === 'ribbon') { px(7,4,'#ff6a8a'); px(9,4,'#ff6a8a'); px(8,5,'#ff6a8a'); px(8,3,'#ff6a8a'); }
+  if (opt.acc === 'headset') {
+    rect(6,3,15,3,'#3a3a44'); rect(2,9,3,12,'#3a3a44'); px(4,13,'#3a3a44'); px(5,14,'#666');
+  }
+}
+
+/* ==================== 캐릭터 정의 ==================== */
+const CHARS = {
+  taro:    { name: 'TARO',  role: '기술적 분석', color: '#4a9edb', room: 'analystGrid',
+             sprite: { body:'#f5e3c3', dark:'#8a6a48', ears:'cat', shirt:'#3d7dd8' },
+             tool: '차트 패턴 분석 중...' },
+  nova:    { name: 'NOVA',  role: '뉴스 분석', color: '#e8a020', room: 'analystGrid',
+             sprite: { body:'#ffe066', dark:'#b8860b', ears:'chick', beak:true, muzzle:false, shirt:'#f28c3b', shirtDots:true },
+             tool: '뉴스 피드 스캔 중...' },
+  diana:   { name: 'DIANA', role: '기본적 분석', color: '#e87ba0', room: 'analystGrid',
+             sprite: { body:'#ffffff', dark:'#b08894', ears:'bunny', acc:'ribbon', shirt:'#ff8fb3' },
+             tool: '재무제표 뒤지는 중...' },
+  vibe:    { name: 'VIBE',  role: '센티먼트', color: '#9b6dd6', room: 'analystGrid',
+             sprite: { body:'#c99b6a', dark:'#6e4f2e', ears:'dog', glasses:true, shirt:'#7d5ac9' },
+             tool: '커뮤니티 반응 수집 중...' },
+  bull:    { name: 'BULL',  role: '매수 논거', color: '#e07030', room: 'researchGrid',
+             sprite: { body:'#f0a35e', dark:'#8a4f1a', ears:'horns', shirt:'#c0392b' },
+             tool: '매수 논거 정리 중...' },
+  bear:    { name: 'BEAR',  role: '매도 논거', color: '#c05050', room: 'researchGrid',
+             sprite: { body:'#c98a80', dark:'#6e3a32', ears:'bear', shirt:'#34495e' },
+             tool: '리스크 목록 작성 중...' },
+  owl:     { name: 'SAGE',  role: '리서치 매니저', color: '#8a7ac0', room: 'managerGrid',
+             sprite: { body:'#b0a5d6', dark:'#57497a', ears:'owl', beak:true, muzzle:false, shirt:'#4a3f6b' },
+             tool: '토론 심판 중...' },
+  ace:     { name: 'ACE',   role: '수석 트레이더', color: '#d8a020', room: 'traderGrid',
+             sprite: { body:'#ffd98a', dark:'#9a742a', ears:'hamster', acc:'headset', shirt:'#2f9e56' },
+             tool: '팀 보고 청취 중...' },
+  risky:   { name: 'BLAZE', role: '공격형', color: '#e06a3a', room: 'riskGrid', mini: true,
+             sprite: { body:'#f08a4b', dark:'#8a4514', ears:'cat', muzzleColor:'#fff3e0', shirt:'#5d3a8a' },
+             tool: '수익 기회 계산 중...' },
+  neutral: { name: 'BAMBOO', role: '중립형', color: '#8a8a8a', room: 'riskGrid', mini: true,
+             sprite: { body:'#f7f7f2', dark:'#555', ears:'panda', patch:'panda', shirt:'#7a7a7a' },
+             tool: '균형점 탐색 중...' },
+  safe:    { name: 'SHELLY', role: '보수형', color: '#3e9e5c', room: 'riskGrid', mini: true,
+             sprite: { body:'#9fd9a8', dark:'#3e6e4a', ears:'none', acc:'shell', shirt:'#3e7c4f' },
+             tool: '최악 시나리오 점검 중...' },
+  boss:    { name: 'BOSS',  role: '펀드 매니저', color: '#5a7ab0', room: 'bossGrid',
+             sprite: { body:'#4a4e5c', dark:'#23252d', ears:'none', patch:'penguinface', beak:true, muzzle:false, acc:'tie', shirt:'#2c3e50', feet:'#ff9b2d' },
+             tool: '최종 승인 검토 중...' },
+};
+
+/* ==================== DOM 구성 ==================== */
+const units = {};
+for (const [id, c] of Object.entries(CHARS)) {
+  const wrap = document.createElement('div');
+  wrap.className = 'unit'; wrap.style.setProperty('--rc', c.color);
+  wrap.innerHTML = `
+    <div class="bubble"><span class="txt"></span><span class="cur">&nbsp;</span></div>
+    <div class="sprite"><canvas></canvas></div>
+    <div class="desk"><div class="monitor"></div><div class="mug"></div></div>
+    <div class="nm">${c.name}</div>
+    <div class="role">${c.role}</div>
+    <div class="status"></div>`;
+  document.getElementById(c.room).appendChild(wrap);
+  const cv = wrap.querySelector('canvas');
+  drawSprite(cv, c.sprite);
+  if (c.mini) { cv.style.width = '52px'; cv.style.height = '52px'; wrap.querySelector('.desk').style.width = '78px'; }
+  wrap.querySelector('.sprite').style.animationDelay = (Math.random() * 2.4).toFixed(2) + 's';
+  // 커스텀 이미지: static/sprites/{id}.png 가 있으면 기본 캐릭터 대신 사용
+  const im = new Image();
+  im.onload = () => {
+    im.style.width = c.mini ? '52px' : '76px';
+    im.style.imageRendering = 'auto';
+    im.style.display = 'block';
+    cv.replaceWith(im);
+  };
+  im.src = `/sprites/${id}.png`;
+  units[id] = {
+    el: wrap,
+    bubble: wrap.querySelector('.bubble .txt'),
+    status: wrap.querySelector('.status'),
+    buf: '',
+  };
+}
+
+/* ==================== 일상 행동 (분석 대기 중) ==================== */
+const IDLE_ACTS = ['커피 리필 중...', '시세 눈팅 중...', '모니터 닦는 중...', '스트레칭 중...',
+                   '메모 정리 중...', '간식 타임 🍪', '기사 스크랩 중...', '계산기 두드리는 중...'];
+setInterval(() => {
+  if (analyzeBtn.disabled) return;   // 분석 중엔 실제 상태 표시 우선
+  const ids = Object.keys(units);
+  const id = ids[Math.floor(Math.random() * ids.length)];
+  const u = units[id];
+  if (u.el.classList.contains('talking') || u.status.textContent) return;
+  const act = IDLE_ACTS[Math.floor(Math.random() * IDLE_ACTS.length)];
+  u.status.textContent = act;
+  setTimeout(() => {
+    if (!analyzeBtn.disabled && u.status.textContent === act) u.status.textContent = '';
+  }, 2800);
+}, 2200);
+
+/* ==================== 시계 ==================== */
+function tickClocks() {
+  const f = tz => new Date().toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+  clkNYC.textContent = f('America/New_York');
+  clkLDN.textContent = f('Europe/London');
+  clkSEL.textContent = f('Asia/Seoul');
+}
+setInterval(tickClocks, 5000); tickClocks();
+dateInput.value = new Date().toISOString().slice(0, 10);
+
+/* ==================== 차트 ==================== */
+async function loadChart(ticker, date) {
+  try {
+    const r = await fetch(`/price?ticker=${encodeURIComponent(ticker)}&trade_date=${date}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    drawChart(d);
+    const last = d.close[d.close.length - 1], prev = d.close[d.close.length - 2] || last;
+    const chg = ((last - prev) / prev * 100).toFixed(2);
+    document.querySelector('#chartInfo .px').textContent = last.toLocaleString();
+    const el = document.querySelector('#chartInfo .chg');
+    el.textContent = (chg >= 0 ? '▲ +' : '▼ ') + chg + '%';
+    el.className = 'chg ' + (chg >= 0 ? 'chg-up' : 'chg-dn');
+    tapeFromSeries(ticker, d);
+  } catch (e) {
+    document.querySelector('#chartInfo .px').textContent = '데이터 없음';
+    console.warn(e);
+  }
+}
+function drawChart(d) {
+  const cv = document.getElementById('chart');
+  cv.width = cv.clientWidth; cv.height = 120;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const all = d.close.concat(d.ma20, d.ma60).filter(v => v != null);
+  const min = Math.min(...all), max = Math.max(...all);
+  const X = i => i / (d.close.length - 1) * (cv.width - 20) + 10;
+  const Y = v => 112 - (v - min) / (max - min || 1) * 96;
+  const line = (arr, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+    let started = false;
+    arr.forEach((v, i) => {
+      if (v == null || isNaN(v)) return;
+      if (!started) { ctx.moveTo(X(i), Y(v)); started = true; } else ctx.lineTo(X(i), Y(v));
+    });
+    ctx.stroke();
+  };
+  line(d.close, '#6de08c'); line(d.ma20, '#ffd24a'); line(d.ma60, '#c77dff');
+}
+function tapeFromSeries(ticker, d) {
+  const parts = [];
+  for (let i = Math.max(1, d.close.length - 12); i < d.close.length; i++) {
+    const chg = (d.close[i] - d.close[i - 1]) / d.close[i - 1] * 100;
+    const cls = chg > 0 ? 'up' : chg < 0 ? 'dn' : 'fl';
+    parts.push(`<span class="${cls}">${d.dates[i]} ${d.close[i].toLocaleString()} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%)</span>`);
+  }
+  tapeInner.innerHTML = `${ticker} ◆ ` + parts.join(' ◆ ') + ' ◆ 연구용 화면 — 투자 자문 아님 ◆ ';
+}
+
+/* ==================== WebSocket ==================== */
+let ws, wsReady = false;
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { wsReady = true; wsState.textContent = '● online'; wsState.style.color = '#6de08c'; };
+  ws.onclose = () => { wsReady = false; wsState.textContent = '○ offline (재접속...)'; wsState.style.color = '#ff6a6a'; setTimeout(connect, 2000); };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+}
+connect();
+
+let activeChar = null;
+function setActive(id) {
+  if (activeChar && units[activeChar]) units[activeChar].el.classList.remove('active');
+  activeChar = id;
+  if (id && units[id]) units[id].el.classList.add('active');
+}
+function talk(id, on) { units[id] && units[id].el.classList.toggle('talking', on); }
+
+function handle(ev) {
+  switch (ev.type) {
+    case 'run_start':
+      currentTicker = ev.ticker;
+      logClear();
+      for (const u of Object.values(units)) { u.buf = ''; u.bubble.textContent = ''; u.status.textContent = ''; u.el.classList.remove('talking'); }
+      analyzeBtn.disabled = true; analyzeBtn.textContent = '분석 중...';
+      logAdd('system', 'SYSTEM', `${ev.ticker} @ ${ev.date} 분석 시작`, '');
+      break;
+    case 'node_active': {
+      const id = ev.char;
+      setActive(id);
+      if (units[id]) units[id].status.textContent = '';
+      break;
+    }
+    case 'token': {
+      const u = units[ev.char]; if (!u) break;
+      setActive(ev.char); talk(ev.char, true);
+      u.buf += ev.text;
+      u.bubble.textContent = u.buf.slice(-220);   // 말풍선엔 마지막 220자
+      u.status.textContent = '';
+      break;
+    }
+    case 'tool': {
+      const u = units[ev.char]; if (!u) break;
+      setActive(ev.char);
+      u.status.textContent = CHARS[ev.char].tool;
+      break;
+    }
+    case 'report': {
+      const c = CHARS[ev.char];
+      logAdd(ev.char, c ? c.name : ev.char, keyLabel(ev.key), ev.text);
+      const u = units[ev.char];
+      if (u) { talk(ev.char, false); u.status.textContent = '보고 완료 ✓'; u.buf = ''; }
+      break;
+    }
+    case 'node_done': {
+      const u = units[ev.char];
+      if (u && !u.status.textContent) u.status.textContent = '완료 ✓';
+      talk(ev.char, false);
+      break;
+    }
+    case 'status':
+      logAdd('system', 'SYSTEM', ev.text, '');
+      break;
+    case 'decision':
+      decisionText.innerHTML = md2html(ev.text);
+      document.getElementById('decisionModal').style.display = 'flex';
+      break;
+    case 'run_done':
+      analyzeBtn.disabled = false; analyzeBtn.textContent = '▶ ANALYZE';
+      setActive(null);
+      logAdd('system', 'SYSTEM', '분석 완료 — 리포트가 ~/.tradingagents/logs/ 에 저장되었습니다', '');
+      break;
+    case 'error':
+      analyzeBtn.disabled = false; analyzeBtn.textContent = '▶ ANALYZE';
+      logAdd('system', 'ERROR', ev.message, '');
+      break;
+    case 'chat_token': {
+      if (bossStreamEl) {
+        bossStreamEl.dataset.raw += ev.text;
+        bossStreamEl.innerHTML = md2html(bossStreamEl.dataset.raw);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      talk('boss', true); setActive('boss');
+      break;
+    }
+    case 'chat_done':
+      chatSend.disabled = false; bossStreamEl = null;
+      talk('boss', false); setActive(null);
+      break;
+    case 'chat_error':
+      chatSend.disabled = false;
+      if (bossStreamEl) { bossStreamEl.textContent = '⚠ ' + ev.message; bossStreamEl = null; }
+      talk('boss', false);
+      break;
+  }
+}
+function keyLabel(k) {
+  return {
+    market_report: '기술적 분석 보고서', sentiment_report: '센티먼트 보고서',
+    news_report: '뉴스 분석 보고서', fundamentals_report: '기본적 분석 보고서',
+    debate: '토론 발언', judge_decision: '리서치 매니저 결론',
+    trader_investment_plan: '트레이더 투자 계획', risk: '리스크 의견',
+    final_trade_decision: '최종 매매 판단',
+  }[k] || k;
+}
+
+/* ==================== 간단 마크다운 렌더러 ==================== */
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function md2html(src) {
+  const lines = esc(src).split('\n');
+  let html = '', inList = false;
+  for (let ln of lines) {
+    ln = ln.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`(.+?)`/g, '<code>$1</code>');
+    const h = ln.match(/^(#{1,4})\s+(.*)/);
+    const li = ln.match(/^\s*[-*•]\s+(.*)/);
+    if (h) { if (inList) { html += '</ul>'; inList = false; } html += `<h4>${h[2]}</h4>`; }
+    else if (li) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${li[1]}</li>`; }
+    else if (/^\s*---+\s*$/.test(ln)) { if (inList) { html += '</ul>'; inList = false; } html += '<hr>'; }
+    else if (ln.trim() === '') { if (inList) { html += '</ul>'; inList = false; } }
+    else { if (inList) { html += '</ul>'; inList = false; } html += `<p>${ln}</p>`; }
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+/* ==================== 로그 ==================== */
+function logClear() { log.innerHTML = ''; }
+function logAdd(charId, name, title, body) {
+  const item = document.createElement('div');
+  item.className = 'logitem';
+  item.innerHTML = `<div class="lh"><b>${name}</b> <span class="lt">${title}</span><span class="tm">${new Date().toLocaleTimeString('ko-KR')}</span><span class="arrow">${body ? '▼ 펼치기' : ''}</span></div><div class="body"></div>`;
+  if (body) item.querySelector('.body').innerHTML = md2html(body);
+  if (charId !== 'system' && CHARS[charId]) {
+    const mini = document.createElement('canvas');
+    drawSprite(mini, CHARS[charId].sprite);
+    item.querySelector('.lh').prepend(mini);
+  }
+  if (body) item.querySelector('.lh').onclick = () => {
+    item.classList.toggle('open');
+    item.querySelector('.arrow').textContent = item.classList.contains('open') ? '▲ 접기' : '▼ 펼치기';
+  };
+  log.appendChild(item);
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ==================== 시스템 점검 ==================== */
+healthBtn.onclick = async () => {
+  healthBtn.disabled = true; healthBtn.textContent = '점검 중...';
+  logAdd('system', 'SYSTEM', '시스템 점검 시작 (데이터 소스 + API 키 실동작 확인)', '');
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    for (const c of d.checks) {
+      logAdd('system', c.ok ? '✅' : '❌', c.name, c.detail);
+    }
+    logAdd('system', 'SYSTEM', d.ok ? '전체 점검 통과 — 분석 실행 가능' : '일부 항목 실패 — ❌ 항목을 펼쳐 원인 확인', '');
+  } catch (e) {
+    logAdd('system', 'ERROR', '점검 API 호출 실패 — server.py가 구버전일 수 있음', String(e));
+  }
+  healthBtn.disabled = false; healthBtn.textContent = '⚙ 시스템 점검';
+};
+
+/* ==================== 종목 검색 자동완성 ==================== */
+let selectedSymbol = '';   // 드롭다운에서 고른 실제 티커
+let searchTimer = null, dropItems = [], dropIndex = -1;
+
+tickerInput.addEventListener('input', () => {
+  selectedSymbol = '';
+  clearTimeout(searchTimer);
+  const q = tickerInput.value.trim();
+  if (!q) { hideDrop(); return; }
+  searchTimer = setTimeout(() => doSearch(q), 220);
+});
+async function doSearch(q) {
+  try {
+    const r = await fetch(`/search?q=${encodeURIComponent(q)}`);
+    const items = await r.json();
+    dropItems = items; dropIndex = -1;
+    if (!items.length) { hideDrop(); return; }
+    searchDrop.innerHTML = items.map((it, i) =>
+      `<div class="opt" data-i="${i}"><b>${it.name}</b><span class="mk">${it.market}</span><span class="sym">${it.symbol}</span></div>`
+    ).join('');
+    searchDrop.style.display = 'block';
+    searchDrop.querySelectorAll('.opt').forEach(el => {
+      el.onmousedown = e => { e.preventDefault(); pick(+el.dataset.i); };
+    });
+  } catch (e) {
+    hideDrop();
+    if (!window._searchWarned) {
+      window._searchWarned = true;
+      logAdd('system', 'ERROR', '종목 검색 API 응답 없음', 'server.py가 구버전이거나 서버가 재시작되지 않았습니다.\n1) 새 server.py를 dashboard/에 복사했는지\n2) 터미널에서 Ctrl+C 후 python dashboard/server.py 재실행했는지 확인하세요.');
+    }
+  }
+}
+function pick(i) {
+  const it = dropItems[i]; if (!it || !it.symbol) return;  // 오류 안내 항목은 선택 불가
+  selectedSymbol = it.symbol;
+  tickerInput.value = `${it.name} (${it.symbol})`;
+  hideDrop();
+}
+function hideDrop() { searchDrop.style.display = 'none'; dropItems = []; dropIndex = -1; }
+tickerInput.addEventListener('keydown', e => {
+  if (searchDrop.style.display === 'block' && dropItems.length) {
+    if (e.key === 'ArrowDown') { dropIndex = Math.min(dropIndex + 1, dropItems.length - 1); markSel(); e.preventDefault(); return; }
+    if (e.key === 'ArrowUp')   { dropIndex = Math.max(dropIndex - 1, 0); markSel(); e.preventDefault(); return; }
+    if (e.key === 'Enter')     { pick(dropIndex >= 0 ? dropIndex : 0); e.preventDefault(); return; }
+    if (e.key === 'Escape')    { hideDrop(); return; }
+  }
+  if (e.key === 'Enter') analyzeBtn.click();
+});
+function markSel() {
+  searchDrop.querySelectorAll('.opt').forEach((el, i) => el.classList.toggle('sel', i === dropIndex));
+}
+document.addEventListener('click', e => { if (!e.target.closest('#searchWrap')) hideDrop(); });
+
+/* 입력값에서 실제 티커 추출: 드롭다운 선택 > 괄호 안 티커 > 원문 그대로 */
+function resolveTicker() {
+  if (selectedSymbol) return selectedSymbol;
+  const v = tickerInput.value.trim();
+  const m = v.match(/\(([A-Za-z0-9.\-^=]+)\)\s*$/);
+  return m ? m[1] : v;
+}
+
+/* ==================== BOSS 상담실 ==================== */
+let currentTicker = '';
+let bossStreamEl = null;
+
+(function initChat() {
+  const icon = document.createElement('canvas');
+  drawSprite(icon, CHARS.boss.sprite);
+  chatBossIcon.appendChild(icon);
+})();
+
+function openChat() {
+  chatDock.classList.add('open');
+  chatOpenBtn.style.display = 'none';
+  pfTicker.textContent = currentTicker || '(종목 미선택)';
+  if (currentTicker) {
+    fetch(`/portfolio?ticker=${encodeURIComponent(currentTicker)}`)
+      .then(r => r.json()).then(d => {
+        pfShares.value = d.shares || '';
+        pfPrice.value = d.avg_price || '';
+        pfInfo.textContent = d.updated ? `저장됨 (${d.updated})` : '';
+      }).catch(() => {});
+  }
+  if (!chatLog.children.length) {
+    addChatMsg('boss', '안녕하세요, 펀드매니저 BOSS입니다. 위 칸에 보유 수량과 평단가를 저장해두시면 그걸 반영해서 상담해드려요. 방금 나온 팀 리포트에 대해 무엇이든 물어보세요.');
+  }
+  chatInput.focus();
+}
+function closeChat() { chatDock.classList.remove('open'); chatOpenBtn.style.display = 'block'; }
+chatOpenBtn.onclick = openChat;
+chatClose.onclick = closeChat;
+if (units.boss) units.boss.el.style.cursor = 'pointer', units.boss.el.addEventListener('click', openChat);
+
+pfSave.onclick = async () => {
+  if (!currentTicker) { pfInfo.textContent = '먼저 종목을 분석하세요'; return; }
+  const r = await fetch('/portfolio', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticker: currentTicker, shares: pfShares.value, avg_price: pfPrice.value }),
+  });
+  const d = await r.json();
+  pfInfo.textContent = d.ok ? '✓ 저장 완료 — BOSS가 상담에 반영합니다' : '저장 실패';
+};
+
+function addChatMsg(who, text) {
+  const div = document.createElement('div');
+  div.className = 'cmsg ' + who;
+  const body = document.createElement('div');
+  body.className = 'cbody';
+  if (who === 'boss') {
+    const icon = document.createElement('canvas');
+    drawSprite(icon, CHARS.boss.sprite);
+    div.appendChild(icon);
+    body.innerHTML = md2html(text);
+  } else body.textContent = text;
+  div.appendChild(body);
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return body;
+}
+function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text || !wsReady) return;
+  addChatMsg('user', text);
+  chatInput.value = '';
+  chatSend.disabled = true;
+  bossStreamEl = addChatMsg('boss', '');
+  bossStreamEl.dataset.raw = '';
+  ws.send(JSON.stringify({ type: 'chat', text }));
+}
+chatSend.onclick = sendChat;
+chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+/* ==================== 분석 시작 ==================== */
+analyzeBtn.onclick = () => {
+  const ticker = resolveTicker();
+  if (!ticker || !wsReady) return;
+  hideDrop();
+  loadChart(ticker, dateInput.value);
+  ws.send(JSON.stringify({ type: 'analyze', ticker, date: dateInput.value }));
+};
+</script>
+</body>
+</html>
