@@ -1,6 +1,6 @@
 # 🏢 Trading Character Floor — TradingAgents 한국주식 커스터마이징
 
-[TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 멀티에이전트 LLM 트레이딩 프레임워크를 한국 개인투자자용으로 확장한 프로젝트입니다.
+[TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) **멀티에이전트 LLM 트레이딩 프레임워크**를 **한국 개인투자자용**으로 확장한 프로젝트입니다.
 
 > 여러 AI 애널리스트(기술적·뉴스·기본적·센티먼트)가 종목을 분석하고, Bull/Bear가 토론하고, 트레이더와 리스크팀이 최종 매매 판단을 내리는 과정을 그대로 재현합니다. TauricResearch는 미국 주식만 지원하지만, 이 버전은 **한국 종목을 API 키 없이** 분석하고 결과를 **한국어**로 출력하며, 그 과정을 **가상 사무실에서 실시간으로** 보여줍니다.
 
