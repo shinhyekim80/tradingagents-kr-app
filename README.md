@@ -43,8 +43,12 @@ conda create -n trading python=3.12 -y && conda activate trading
 pip install -e .          # 대시보드·한국데이터 의존성까지 한 번에 설치
 
 cp .env.example .env
-# .env 에 OPENAI_API_KEY=sk-... 추가 (FRED_API_KEY 는 선택)
+# .env 에 아래 중 하나만 넣으면 됩니다 (FRED_API_KEY 는 선택)
+#   OPENAI_API_KEY=sk-...            ← OpenAI(GPT) 사용
+#   ANTHROPIC_API_KEY=sk-ant-...     ← Claude 사용
 ```
+
+> **LLM 키는 OpenAI · Claude 둘 다 지원.** `.env`에 넣은 키를 **자동 감지**해서 그 제공자로 돌아갑니다(둘 다 넣으면 OpenAI 우선). `LLM_PROVIDER=anthropic` 처럼 강제 지정도 가능. 한국 주식 데이터는 여전히 키가 필요 없습니다.
 
 ## 🚀 실행
 

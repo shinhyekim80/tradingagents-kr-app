@@ -17,15 +17,35 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
 
+def resolve_provider() -> tuple[str, str, str]:
+    """활성 LLM 제공자와 (provider, deep_model, quick_model)를 결정.
+
+    LLM_PROVIDER=openai|anthropic 로 강제 지정 가능. 없으면 .env에 있는 키로
+    자동 감지(OpenAI 우선, 없으면 Anthropic). 둘 다 없으면 openai로 둔다.
+    """
+    import os
+    forced = os.getenv("LLM_PROVIDER", "").strip().lower()
+    if forced in ("openai", "anthropic"):
+        provider = forced
+    elif os.getenv("OPENAI_API_KEY"):
+        provider = "openai"
+    elif os.getenv("ANTHROPIC_API_KEY"):
+        provider = "anthropic"
+    else:
+        provider = "openai"
+    if provider == "anthropic":
+        return "anthropic", "claude-sonnet-5", "claude-haiku-4-5-20251001"
+    return "openai", "gpt-5.4-mini", "gpt-5.4-nano"
+
+
 def build_config() -> dict:
     config = DEFAULT_CONFIG.copy()
 
-    # --- 저비용 LLM 조합 ---
-    # 대안: llm_provider="deepseek" + deep/quick 모두 "deepseek-v4-flash" (더 저렴)
-    #       llm_provider="google"   + "gemini-3.1-flash-lite"
-    config["llm_provider"] = "openai"
-    config["deep_think_llm"] = "gpt-5.4-mini"    # 토론·최종판단용
-    config["quick_think_llm"] = "gpt-5.4-nano"   # 데이터 요약용 (호출 횟수 多)
+    # --- 저비용 LLM 조합 (.env 키로 자동 감지: OpenAI / Anthropic) ---
+    provider, deep_model, quick_model = resolve_provider()
+    config["llm_provider"] = provider
+    config["deep_think_llm"] = deep_model    # 토론·최종판단용
+    config["quick_think_llm"] = quick_model  # 데이터 요약용 (호출 횟수 多)
 
     # 토론 라운드 1회 = 비용 최소화. 품질 우선이면 2로.
     config["max_debate_rounds"] = 1

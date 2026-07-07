@@ -67,11 +67,34 @@ REPORT_KEYS = {
 }
 
 
+def resolve_provider() -> tuple[str, str, str]:
+    """활성 LLM 제공자와 (provider, deep_model, quick_model)를 결정.
+
+    우선순위:
+      1) 환경변수 LLM_PROVIDER=openai|anthropic 가 있으면 그것을 따름
+      2) 없으면 .env에 있는 키로 자동 감지 (OpenAI 우선, 없으면 Anthropic)
+    키가 하나도 없으면 openai로 두고 실행 시 ⚙ 시스템 점검에서 안내한다.
+    """
+    forced = os.getenv("LLM_PROVIDER", "").strip().lower()
+    if forced in ("openai", "anthropic"):
+        provider = forced
+    elif os.getenv("OPENAI_API_KEY"):
+        provider = "openai"
+    elif os.getenv("ANTHROPIC_API_KEY"):
+        provider = "anthropic"
+    else:
+        provider = "openai"
+    if provider == "anthropic":
+        return "anthropic", "claude-sonnet-5", "claude-haiku-4-5-20251001"
+    return "openai", "gpt-5.4-mini", "gpt-5.4-nano"
+
+
 def build_config() -> dict:
     config = DEFAULT_CONFIG.copy()
-    config["llm_provider"] = "openai"
-    config["deep_think_llm"] = "gpt-5.4-mini"
-    config["quick_think_llm"] = "gpt-5.4-nano"
+    provider, deep_model, quick_model = resolve_provider()
+    config["llm_provider"] = provider
+    config["deep_think_llm"] = deep_model
+    config["quick_think_llm"] = quick_model
     config["max_debate_rounds"] = 1
     config["max_risk_discuss_rounds"] = 1
     # 초보자 눈높이 한국어 출력 (이 문자열이 프롬프트에 삽입됨)
@@ -174,8 +197,6 @@ class RunManager:
 
     def _chat_run(self, text: str):
         try:
-            from openai import OpenAI
-
             cfg = build_config()
             portfolio = load_portfolio()
             pf = portfolio.get(self.last_ticker or "", {})
@@ -205,18 +226,34 @@ class RunManager:
 [사용자 보유 현황] {json.dumps(pf, ensure_ascii=False) if pf else '미입력 — 수량과 평단가를 물어보고 화면의 보유현황 칸에 저장하도록 안내'}
 [팀 리포트]{reports if reports else ' (아직 분석 실행 전)'}"""
 
-            msgs = ([{"role": "system", "content": sys_prompt}]
-                    + self.chat_history[-12:]
-                    + [{"role": "user", "content": text}])
-            client = OpenAI()
-            stream = client.chat.completions.create(
-                model=cfg["deep_think_llm"], messages=msgs, stream=True)
+            history = self.chat_history[-12:] + [{"role": "user", "content": text}]
             full = ""
-            for ch in stream:
-                delta = ch.choices[0].delta.content or ""
-                if delta:
-                    full += delta
-                    self.emit(type="chat_token", char="boss", text=delta)
+            if cfg["llm_provider"] == "anthropic":
+                from anthropic import Anthropic
+
+                client = Anthropic()
+                with client.messages.stream(
+                    model=cfg["deep_think_llm"],
+                    max_tokens=1024,
+                    system=sys_prompt,
+                    messages=history,
+                ) as stream:
+                    for delta in stream.text_stream:
+                        if delta:
+                            full += delta
+                            self.emit(type="chat_token", char="boss", text=delta)
+            else:
+                from openai import OpenAI
+
+                client = OpenAI()
+                msgs = [{"role": "system", "content": sys_prompt}] + history
+                stream = client.chat.completions.create(
+                    model=cfg["deep_think_llm"], messages=msgs, stream=True)
+                for ch in stream:
+                    delta = ch.choices[0].delta.content or ""
+                    if delta:
+                        full += delta
+                        self.emit(type="chat_token", char="boss", text=delta)
             self.chat_history += [{"role": "user", "content": text},
                                   {"role": "assistant", "content": full}]
             self.emit(type="chat_done", text=full)
@@ -430,13 +467,21 @@ def health():
         except Exception as e:
             checks.append({"name": name, "ok": False, "detail": str(e)[:300]})
 
-    def _openai():
+    def _llm_key():
+        provider, deep_model, quick_model = resolve_provider()
+        if provider == "anthropic":
+            key = os.getenv("ANTHROPIC_API_KEY", "")
+            if not key:
+                raise RuntimeError(".env에 ANTHROPIC_API_KEY 없음")
+            from anthropic import Anthropic
+            Anthropic().models.list()  # 키 유효성 실검증
+            return f"Claude 키 유효 (...{key[-4:]}) · 모델 {deep_model}/{quick_model}"
         key = os.getenv("OPENAI_API_KEY", "")
         if not key:
-            raise RuntimeError(".env에 OPENAI_API_KEY 없음")
+            raise RuntimeError(".env에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY 없음")
         from openai import OpenAI
         OpenAI().models.list()  # 키 유효성 실검증 (무료 호출)
-        return f"키 유효 (sk-...{key[-4:]})"
+        return f"OpenAI 키 유효 (sk-...{key[-4:]}) · 모델 {deep_model}/{quick_model}"
 
     def _krx_listing():
         from tradingagents.dataflows import krx as krx_mod
@@ -473,7 +518,7 @@ def health():
             raise RuntimeError(out[:200])
         return out.splitlines()[0][:150]
 
-    add("OpenAI API 키", _openai)
+    add("LLM API 키 (OpenAI/Claude 자동감지)", _llm_key)
     add("한국 종목 목록 (검색용)", _krx_listing)
     add("한국 시세 (FinanceDataReader)", _kr_price)
     add("한국 펀더멘털 (네이버)", _kr_fund)
